@@ -8,6 +8,7 @@ const MongoStore = require('connect-mongo')(session);
 const passport = require('passport');
 const { connectDB } = require('./config/db.js');
 const morgan = require('morgan');
+const methodOverride = require('method-override')
 
 //Load config
 dotenv.config({ path: "./config/config.env" });
@@ -23,16 +24,28 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }))
 
+// Method override
+
+app.use(methodOverride(function (req, res) {
+    if (req.body && typeof req.body === 'object' && '_method' in req.body) {
+        // look in urlencoded POST bodies and delete it
+        var method = req.body._method
+        delete req.body._method
+        return method
+    }
+}))
+
+
 //Logging
 if (process.env.NODE_ENV === "development") {
     app.use(morgan('dev'));
 }
 
 // Handlebars helper
-const { formatDate } = require('./helpers/hbs');
+const { formatDate, truncate, stripTags, editIcon, select } = require('./helpers/hbs');
 
 // Handlebars template engine
-app.engine('.hbs', exphbs.engine({ helpers: { formatDate }, defaultLayout: 'main', extname: '.hbs' }));
+app.engine('.hbs', exphbs.engine({ helpers: { formatDate, truncate, stripTags, editIcon, select }, defaultLayout: 'main', extname: '.hbs' }));
 app.set('view engine', '.hbs')
 
 //Sessions
@@ -46,6 +59,12 @@ app.use(session({
 //Passport middlewares
 app.use(passport.initialize());
 app.use(passport.session());
+
+// Global variable
+app.use(function (req, res, next) {
+    res.locals.user = req.user || null;
+    next();
+})
 
 // Static folder
 app.use(express.static(path.join(__dirname, 'public')))
